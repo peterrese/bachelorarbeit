@@ -246,7 +246,7 @@ def create_markov_matrix(n: int) -> np.ndarray:
 def build_uniform_interim_matrix(m: int) -> np.ndarray:
     """
     Erzeugt die Interim-Übergangsmatrix der Größe m x m gemäß der
-    Birth-Death-Vorschrift:
+    Vorschrift:
     - Zustand 0 (Index 0) <-> Zustand 1 in Formel: Selbstschleife (m-1)/m,
       Schritt nach rechts 1/m.
     - Zustand m-1 (Index m-1) <-> Zustand m: Selbstschleife (m-1)/m,
@@ -350,64 +350,74 @@ def step_counter_stationary_distribution(P: np.ndarray, change_value: float = 1e
 
 def stationary_distribution(P: np.ndarray) -> np.ndarray:
     """
-    Computes the stationary distribution of a transition matrix P.
+    Rechnet die stationäre Verteilung von der Matrix P.
     """
     
     eigenvalues, eigenvectors = np.linalg.eig(P.T)
-   
-    # Find the index of the eigenvalue that is 1 (or very close to 1)
+    #Berechnet die Eigenwerte und Eigenvektoren von der Matrix P aus einem von Numpy gegebenen Algorythmus
+    
+    # Sucht nach dem Eigenwert, welcher 1 ist (oder sehr nahe an 1 liegt wegen Rundungsfehlern)
     idx = np.argmin(np.abs(eigenvalues - 1))
-    # set pi to the corresponding eigenvector, take real part and normalize to sum to 1
+    # Nimmt den Eigenvektor, welcher zu dem gerade gefundenen Eigenwert (1 oder sehr nah an 1 ist) und setzt diesen als pi 
     pi = np.real(eigenvectors[:, idx])
-    pi /= pi.sum()  # Normalize to sum to 1
+    #Normaliesiert die Einträge auf 1 
+    pi /= pi.sum() 
+    #pi ist die Stationäre verteilung
     return pi
 
-# Berechnung der vollständigen Hitting-Time-Matrix
+# Berechnung der vollständigen Treffer-Zeit-Matrix
 def hitting_time_matrix(P: np.ndarray) -> np.ndarray:
-    # Anzahl der Zustände in der Markov-Kette
+    # Anzahl der Zustände in der Markow-Kette
     n = P.shape[0]
-    # Initialisierung der Hitting-Time-Matrix mit Nullen
+    # Initialisierung der Treffer-Zeit-Matrix mit ersteinmal Nullen
     H = np.zeros((n, n))
     # Berechnung der erwarteten Treffzeit für jedes Paar von Start- und Zielzuständen
-    for start in range(n):
-        for target in range(n):
-            H[start, target] = expected_hitting_time(P, start, target)
+    for start in range(n): #Der Reihe nach jeder Zustand als Startpunkt
+        for target in range(n): #Der Reihe nach jeden Zustand als Zielpunkt
+            H[start, target] = expected_hitting_time(P, start, target) 
+            #Funktion (eexpected_hitting_time) wird aufgerufen und rechnet die Ergebisse aus
     return H
 
 
 def expected_hitting_time(P, start, target):
-    n = P.shape[0]
+    
+    
+    n = P.shape[0] 
 
     if start == target:
-        return 0.0
+        return 0.0 #Wenn wir direkt am Zielpunkt sind sind es 0 schritte
 
-    # We solve: h[i] = 1 + sum_j P[i,j] h[j], with h[target]=0
-
-    A = np.eye(n)
-    b = np.ones(n)
+    # Die durchschnittliche Trefferzeit von i aus (h[i]) ist genau 1 (Schritt) plus die durchschnittliche 
+    # Trefferzeit von all den Feldern, in die wir von i aus gehen können (h[j]), gewichtet mit der Wahrscheinlichkeit, 
+    # dass wir tatsächlich dorthin gehen (P[i,j])
+    A = np.eye(n) # erstellen einer Identitätsmatrix
+    b = np.ones(n) # erstellt einen Spaltenvektor mit 1sen
 
     for i in range(n):
-        A[i, target] = 0.0  # remove dependency on target
-        if i == target:
-            A[i, :] = 0.0
+        A[i, target] = 0.0  #  Wir streichen in jeder Zeile den Eintrag durch, der in der Spalte des Zielfeldes steht.
+        if i == target: #Wenn wir auf der Zeile des Zielfeldes sind setzen wir dieses 0, nur die Diagonale (i,i)
+            A[i, :] = 0.0 #auf 1 und b = 0
             A[i, i] = 1.0
             b[i] = 0.0
         else:
-            # move target contribution to RHS
-            b[i] += P[i, target] * 0.0  # (kept for clarity)
+            
+            b[i] += P[i, target] * 0.0  # Denkstütze
 
-    # rewrite full system properly:
+    # Wir gehe durch jeden Eintrag der Matrix A. Für jedes Feld j, das nicht das Zielfeld ist,
+    # ziehen wir die Übergangswahrscheinlichkeit P[i, j] von dem ab, was vorher in A[i, j] stand.
     for i in range(n):
         for j in range(n):
             if j != target:
                 A[i, j] -= P[i, j]
 
-    A[target, :] = 0.0
-    A[target, target] = 1.0
-    b[target] = 0.0
+    A[target, :] = 0.0    #Sicherheitshalber überschreiben der Zielferlder
+    A[target, target] = 1.0  # Nur der Eintrag ganz unten rechts wird auf 1 gesetzt
+    b[target] = 0.0  # Wert des Target in b wird 0 gesetzt
 
-    h = np.linalg.solve(A, b)
-    return float(h[start])
+    h = np.linalg.solve(A, b) #Löst die Gleichung A*(unbekannter Vektor)=b gibt mit den Vektor h
+    return float(h[start]) #Nur der Eintrag zu dem Startfeld wird benötigt und zurückgegeben.
+
+
 if __name__ == "__main__":
     # Definition der drei Matrixgrößen für die erweiterte Markov-Ketten - n1 für Matrix 1, n2 für Matrix 2, m für die Interim-Matrix
     n1 = 4   
@@ -415,17 +425,17 @@ if __name__ == "__main__":
     m = 6 
     
 
-    # Version 1 with uniform interim matrix
-    #P = build_extended_markov_chain(n1, n2, m) #Bsp 1
+    # Modell 2 
+    #P = build_extended_markov_chain(n1, n2, m) 
     
-    # Version 2 with weighted interim matrix
-    P= build_extended_markov_chain_v2(n1, n2, m) #Bsp 2 
+    # Modell 3
+    P= build_extended_markov_chain_v2(n1, n2, m) 
     
     
     
     eigenwerte = np.linalg.eigvals(P)
-    #print eigenwerte sorted by absolute value, with 2 decimal places
-    print("Eigenvalues of P (sorted by absolute value, with 2 decimal places):")
+    #Gibt die Eigenwerte wieder.
+    print("Eigenwerte von P (sortiert nach absoluter größe):")
     sorted_indices = np.argsort(np.abs(eigenwerte))[::-1]
     for idx in sorted_indices:
         print(f"{eigenwerte[idx]:.8f}")
@@ -433,20 +443,20 @@ if __name__ == "__main__":
     
     
     print("--------------------------------")
-    print("Full transition matrix P (with 2 decimal places):")
+    print("Komplette übergangsmatrix P:")
     print(P)
     print("--------------------------------")
     
     
-    # Hitting-Time-Matrix
+    # Treffer-Zeit-Matrix
     H = hitting_time_matrix(P)
-    print("Hitting-Time-Matrix H (mit 2 Dezimalstellen):")
+    print("Treffer-Zeit-Matrix H:")
     print(H)
     print("--------------------------------")
     
-    # Cover-Time-Vector(Highest value in each row of H)
+    # Deckungszeit Vektor
     cover_time_vector = np.max(H, axis=1)
-    print("Cover-Time-Vector (mit 2 Dezimalstellen):")
+    print("Deckungszeit Vektor:")
     print(cover_time_vector)
     print("--------------------------------")
     #Schrittweise Berechnung der stationären Verteilung durch Iteration und Abbruchbedingung, wenn die Änderung kleiner als change_value ist. Vergleich mit der stationären Verteilung aus der Eigenvektormethode.
@@ -458,22 +468,23 @@ if __name__ == "__main__":
     stationary_dist = stationary_distribution(P)
     print("Stationäre Verteilung:" + f" {stationary_dist}")
 
-    P_size = []
+
+    P_size = [] #Visualisierung der Mischzeiten Modell 2
     mixing_times = []
     for i in range(2,1000000,2): 
-        
+        #Visualisierung der Vergrößerung der Mischzeit durch Vergrößerung der Gesamtmatrix
         P = build_extended_markov_chain(i,i+2,i)
         if P.shape[0] > 100:
             print(P.shape[0])
             break
         eigenwerte = np.linalg.eigvals(P)
-        #print eigenwerte sorted by absolute value, with 2 decimal places
+        #gibt die Eigenwerte sortiert der ansoluten Größe wieder
         sorted_indices = np.argsort(np.abs(eigenwerte))[::-1]
         
         second_largest = eigenwerte[sorted_indices[1]]
-        #Spektraldistanz und Mischzeitannäherung 
+        #Spektraldistanz und Mischzeitannäherung mit der Formel aus der Bachlerarbeit 
         mixing_time = (np.log(P.shape[0])/(1-second_largest))
-        # add to list 
+        # in Liste speichern 
         P_size.append(P.shape[0])
         mixing_times.append(np.abs(np.real(mixing_time)))
     counter = 0 
@@ -483,20 +494,20 @@ if __name__ == "__main__":
     
     df = pd.DataFrame({'P_size': P_size, 'mixing_times': mixing_times})
 
-    # Create the line plot
+    # Erstellt den lineplot
     sns.lineplot(data=df, x='P_size', y='mixing_times', marker='o')  # marker adds points
 
-    # Add labels and title
+    # X,Y Achsen beschriftung und Titel
     plt.xlabel('Größe der Gesamtmatrix')
     plt.ylabel('Mischzeit in $10^6$ Schritte')
     plt.title("Annäherung an die Mischzeit bei Modell 2")
 
-    # Show the plot
+    # gibt den Plot aus
     plt.savefig("v1.pdf", format= "pdf", bbox_inches="tight")
     plt.show()
     
     
-    P_size = []
+    P_size = [] #Visuallisierung der Mischzeiten Modell 3 genau gleich wie Modell2 nur mit andere Daten
     mixing_times = []
     for i in range(2,1000000,2): 
         
@@ -504,13 +515,13 @@ if __name__ == "__main__":
         if P.shape[0] > 100:
             break
         eigenwerte = np.linalg.eigvals(P)
-        #print eigenwerte sorted by absolute value, with 2 decimal places
+
         sorted_indices = np.argsort(np.abs(eigenwerte))[::-1]
         
         second_largest = eigenwerte[sorted_indices[1]]
-        #Spektraldistanz und Mischzeitannäherung 
+
         mixing_time = (np.log(P.shape[0])/(1-second_largest))
-        # add to list 
+
         P_size.append(P.shape[0])
         mixing_times.append(np.abs(np.real(mixing_time)))
     counter = 0 
@@ -520,15 +531,12 @@ if __name__ == "__main__":
     
     df = pd.DataFrame({'P_size': P_size, 'mixing_times': mixing_times})
 
-    # Create the line plot
-    sns.lineplot(data=df, x='P_size', y='mixing_times', marker='o')  # marker adds points
+    sns.lineplot(data=df, x='P_size', y='mixing_times', marker='o')  # marker erstellt die Punkte
 
-    # Add labels and title
     plt.xlabel('Größe der Gesamtmatrix')
     plt.ylabel('Mischzeit in $10^{16}$ Schritte')
     plt.title("Annäherung an die Mischzeit bei Modell 3")
 
-    # Show the plot
     plt.savefig("v2.pdf", format= "pdf", bbox_inches="tight")
     plt.show()
 
