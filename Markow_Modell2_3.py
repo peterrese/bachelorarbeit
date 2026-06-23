@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 n1 = 4  # A-Matrix-Größe
 n2 = 4  # C-Matrix-Größe
-m = 6   # B-Matrix-Größe
+m = 6   # B/E-Matrix-Größe
 
 
 np.set_printoptions(precision=2, suppress=True, linewidth=120) 
@@ -16,8 +16,67 @@ np.set_printoptions(precision=2, suppress=True, linewidth=120)
 
 
 def build_extended_markov_chain(n1: int, n2: int, m: int) -> np.ndarray:
+    
     """
-    Baut die gesamte Übergangsmatrix mit den Zuständen = (matrix, current_state).
+    Erstellt die vollständige Übergangsmatrix einer erweiterten Markov-Kette,
+    die aus zwei Randmatrizen und einer dazwischenliegenden Übergangsmatrix
+    besteht.
+
+    Die Gesamtstruktur setzt sich aus drei Teilmatrizen zusammen:
+
+    1. Matrix A (Größe: (n1 + 1) × (n1 + 1))
+    Beschreibt die Zustände des ersten Randbereichs.
+
+    2. Interim-Matrix B (Größe: m × m)
+    Beschreibt den Übergangsbereich zwischen den beiden Randmatrizen.
+    Die Übergangswahrscheinlichkeiten sind gleichverteilt
+    (1 / m für jeden möglichen Folgezustand).
+
+    3. Matrix C (Größe: (n2 + 1) × (n2 + 1))
+    Beschreibt die Zustände des zweiten Randbereichs.
+
+    Die äußersten Zustände der Randmatrizen werden mit den Randzuständen
+    der Interim-Matrix verbunden:
+    - Der letzte Zustand von Matrix A wird mit dem ersten Zustand der
+    Interim-Matrix verknüpft.
+    - Der letzte Zustand der Interim-Matrix wird mit dem letzten Zustand
+    von Matrix C verknüpft.
+
+    Alle Teilmatrizen werden in eine gemeinsame Übergangsmatrix P
+    eingebettet. Anschließend wird überprüft, ob jede Zeile von P eine
+    gültige Wahrscheinlichkeitsverteilung bildet (Zeilensumme = 1).
+
+    Parameters
+    ----------
+    n1 : int
+        Anzahl der Zustände des ersten Randbereichs minus eins.
+        Die erzeugte Teilmatrix A besitzt die Dimension
+        (n1 + 1) × (n1 + 1).
+
+    n2 : int
+        Anzahl der Zustände des zweiten Randbereichs minus eins.
+        Die erzeugte Teilmatrix C besitzt die Dimension
+        (n2 + 1) × (n2 + 1).
+
+    m : int
+        Anzahl der Zustände der Interim-Matrix.
+
+    Returns
+    -------
+    np.ndarray
+        Die vollständige Übergangsmatrix P der erweiterten Markov-Kette
+        mit der Dimension
+
+            ((n1 + 1) + m + (n2 + 1))
+            ×
+            ((n1 + 1) + m + (n2 + 1)).
+
+    Raises
+    ------
+    AssertionError
+        Falls mindestens eine Zeile der resultierenden Übergangsmatrix
+        keine Summe von 1 besitzt und somit keine gültige
+        Wahrscheinlichkeitsverteilung darstellt.
     """
     #assert m % 2 == 0, "Interim matrix size m must be even"
     #assert m >= 4, "Interim matrix size m must be at least 4"
@@ -117,13 +176,74 @@ def build_extended_markov_chain(n1: int, n2: int, m: int) -> np.ndarray:
 
 def build_extended_markov_chain_v2(n1: int, n2: int, m: int) -> np.ndarray:
     """
-    Erweiterte Markow-Kette mit drei Blöcken:
-    - Matrix 1/A (Größe n1+1)
-    - Interim B/E (Größe m, erzeugt durch build_uniform_interim_matrix)
-    - Matrix 2/B (Größe n2+1)
+    Erstellt die Übergangsmatrix einer erweiterten Markov-Kette mit zwei
+    Randbereichen und einer gewichteten Übergangsmatrix.
+
+    Die Gesamtmatrix setzt sich aus drei miteinander verbundenen Blöcken
+    zusammen:
+
+    1. Matrix A (Größe: (n1 + 1) × (n1 + 1))
+    Erster Randbereich der Markov-Kette.
+
+    2. Interim-Matrix E (Größe: m × m)
+    Übergangsbereich zwischen den Randmatrizen. Die Matrix wird durch
+    ``build_weighted_interim_matrix()`` erzeugt und besitzt eine
+    gewichtete Struktur:
+    - Die Randzustände besitzen eine hohe Wahrscheinlichkeit für den
+    Verbleib am Rand und eine geringe Wahrscheinlichkeit für den
+    Übergang zum benachbarten Interim-Zustand.
+    - Innere Zustände können ausschließlich zu ihren direkten Nachbarn
+    wechseln.
+
+    3. Matrix C (Größe: (n2 + 1) × (n2 + 1))
+    Zweiter Randbereich der Markov-Kette.
+
+    Die äußersten Zustände der Randmatrizen werden mit den Randzuständen
+    der Interim-Matrix verbunden:
+    - Die Selbstschleife des äußersten Zustands von Matrix A wird auf den
+    ersten Zustand der Interim-Matrix umgeleitet.
+    - Die Selbstschleife des äußersten Zustands von Matrix B wird auf den
+    letzten Zustand der Interim-Matrix umgeleitet.
+    - Umgekehrt führen die Randzustände der Interim-Matrix zurück zu den
+    äußersten Zuständen der jeweiligen Randmatrix.
+
+    Alle Teilmatrizen werden in eine gemeinsame Übergangsmatrix P
+    eingebettet. Abschließend wird überprüft, ob jede Zeile eine gültige
+    Wahrscheinlichkeitsverteilung darstellt (Zeilensumme = 1).
+
+    Parameters
+    ----------
+    n1 : int
+        Anzahl der Zustände des ersten Randbereichs minus eins.
+        Die erzeugte Teilmatrix A besitzt die Dimension
+        (n1 + 1) × (n1 + 1).
+
+    n2 : int
+        Anzahl der Zustände des zweiten Randbereichs minus eins.
+        Die erzeugte Teilmatrix C besitzt die Dimension
+        (n2 + 1) × (n2 + 1).
+
+    m : int
+        Anzahl der Zustände der gewichteten Interim-Matrix E.
+
+    Returns
+    -------
+    np.ndarray
+        Vollständige Übergangsmatrix der erweiterten Markov-Kette mit der
+        Dimension
+
+            ((n1 + 1) + m + (n2 + 1))
+            ×
+            ((n1 + 1) + m + (n2 + 1)).
+
+    Raises
+    ------
+    AssertionError
+        Falls mindestens eine Zeile der erzeugten Übergangsmatrix keine
+        Summe von 1 besitzt und somit keine gültige
+        Wahrscheinlichkeitsverteilung darstellt.
+
     """
-    #assert m % 2 == 0, "Interim matrix size m must be even"
-    #assert m >= 4, "Interim matrix size m must be at least 4"
 
     #obere Markov-Kette(links oben)
     M1 = create_markov_matrix(n1)   # wird extern definiert
@@ -221,8 +341,58 @@ def build_extended_markov_chain_v2(n1: int, n2: int, m: int) -> np.ndarray:
 
 def create_markov_matrix(n: int) -> np.ndarray:
     """
-    Erstellt eine (n+1) x (n+1) Übergangs Matrix.
-    Der äußere punkt (index n) ist nicht absorbierend – er kann in den letzten inneren Punkt.
+    Erzeugt die Übergangsmatrix eines Randbereichs der erweiterten
+    Markov-Kette.
+
+    Die Matrix besitzt n innere Zustände sowie einen zusätzlichen
+    äußeren Zustand. Der äußere Zustand ist nicht absorbierend, sondern
+    dient als Kopplungspunkt zur Interim-Matrix der erweiterten
+    Markov-Kette.
+
+    Struktur der Übergänge
+    ----------------------
+    - Die inneren Zustände besitzen gleichverteilte Übergänge zu allen
+    inneren Zuständen.
+    - Der letzte innere Zustand besitzt zusätzlich eine Übergangswahrscheinlichkeit
+    zum äußeren Zustand.
+    - Der äußere Zustand wechselt mit hoher Wahrscheinlichkeit zurück
+    zum letzten inneren Zustand und verbleibt nur mit geringer
+    Wahrscheinlichkeit in sich selbst.
+
+    Dadurch entsteht ein Randbereich, dessen Dynamik überwiegend im
+    Inneren stattfindet, der jedoch über den äußeren Zustand mit einem
+    Übergangsbereich (Interim-Matrix) verbunden werden kann.
+
+    Parameters
+    ----------
+    n : int
+        Anzahl der inneren Zustände. Die resultierende Matrix besitzt
+        insgesamt n + 1 Zustände, wobei der letzte Zustand den äußeren
+        Zustand darstellt.
+
+    Returns
+    -------
+    np.ndarray
+        Übergangsmatrix der Dimension (n + 1) × (n + 1). Jede Zeile
+        stellt eine Wahrscheinlichkeitsverteilung dar und summiert sich
+        zu 1.
+
+    Notes
+    -----
+    Für den äußeren Zustand gelten die Wahrscheinlichkeiten
+
+    .. math::
+
+        P(n,n) = \\frac{1}{(n+1)^2}
+
+    und
+
+    .. math::
+
+        P(n,n-1) = 1 - P(n,n),
+
+    sodass ein Rücksprung in den letzten inneren Zustand deutlich
+    wahrscheinlicher ist als ein Verbleib im äußeren Zustand.
     """
     #n+1 weil wir n innere Zustände haben plus einen äußeren Zustand, der nicht absorbierend ist, sondern Übergänge zur Interim-Matrix ermöglicht.
     size = n + 1
@@ -245,17 +415,61 @@ def create_markov_matrix(n: int) -> np.ndarray:
     M[n, n - 1] = 1.0 - M[n, n]
     return M
 
-# Für Modell 2
+# Für Modell 2 (B)
 def build_uniform_interim_matrix(m: int) -> np.ndarray:
     """
-    Erzeugt die Interim-Übergangsmatrix der Größe m x m gemäß der
-    Vorschrift:
-    - Zustand 0 (Index 0) <-> Zustand 1 in Formel: Selbstschleife (m-1)/m,
-      Schritt nach rechts 1/m.
-    - Zustand m-1 (Index m-1) <-> Zustand m: Selbstschleife (m-1)/m,
-      Schritt nach links 1/m.
-    - Für 1 <= i <= m-2: Übergang i -> i+1 mit (i+1)/m,
-      i -> i-1 mit (m-(i+1))/m. (Da i intern 0‑basiert, ist Zustandsnummer = i+1)
+    Erzeugt die Übergangsmatrix des Interim-Bereichs einer erweiterten
+    Markov-Kette.
+
+    Die Matrix beschreibt einen eindimensionalen Zustandsraum mit m
+    Zuständen. Übergänge sind ausschließlich zwischen benachbarten
+    Zuständen möglich.
+
+    Randzustände
+    ------------
+    Der erste und letzte Zustand besitzen jeweils eine Selbstschleife
+    sowie einen Übergang zum einzigen Nachbarzustand:
+
+    - Zustand 0:
+        * P(0,0) = (m-1)/m
+        * P(0,1) = 1/m
+
+    - Zustand m-1:
+        * P(m-1,m-1) = (m-1)/m
+        * P(m-1,m-2) = 1/m
+
+    Innere Zustände
+    ---------------
+    Für jeden inneren Zustand i mit 1 ≤ i ≤ m-2 gilt:
+
+    - Übergang nach rechts:
+
+    P(i,i+1) = (i+1)/m
+
+    - Übergang nach links:
+
+    P(i,i-1) = (m-(i+1))/m
+
+    Die Wahrscheinlichkeiten eines Zustands summieren sich jeweils zu 1.
+
+    Parameters
+    ----------
+    m : int
+        Anzahl der Zustände der Interim-Matrix.
+
+    Returns
+    -------
+    np.ndarray
+        Übergangsmatrix der Dimension m × m.
+
+    Notes
+    -----
+    Die Matrix beschreibt einen gerichteten Random Walk mit
+    zustandsabhängiger Drift. Für kleine Zustandsindizes ist die
+    Wahrscheinlichkeit eines Schritts nach links größer, während für
+    große Zustandsindizes die Wahrscheinlichkeit eines Schritts nach
+    rechts überwiegt. Die Randzustände besitzen zusätzlich eine
+    Selbstschleife mit Wahrscheinlichkeit (m-1)/m.
     """
     P = np.zeros((m, m))
     for i in range(m):
@@ -275,20 +489,69 @@ def build_uniform_interim_matrix(m: int) -> np.ndarray:
             P[i, i-1] = p_left
     return P
 
-#Für Modell 3
+#Für Modell 3 (E)
 def build_weighted_interim_matrix(z):
     """
-    Erzeugt die Übergangsmatrix P der Größe z×z nach der Vorschrift:
-    - Erste Zeile: P(1,1) = (z-1)/z, P(1,2) = 1/z, sonst 0.
-    - Für i = 2 .. z/2:
-        P(i, i-1) = (z - (i-1)) / z
-        P(i, i+1) = (i-1) / z
-        Diagonale = 0.
-    - Für i = z/2+1 .. z wird die Matrix durch Spiegelung an der Anti-Diagonalen
-      aus den ersten z/2 Zeilen aufgebaut:
-        P(i, j) = P(z+1-i, z+1-j)
-    Die Matrix ist zeilenstochastisch und symmetrisch bzgl. der Anti-Diagonalen.
+    Erzeugt eine gewichtete Übergangsmatrix für den Interim-Bereich einer
+    erweiterten Markov-Kette.
 
+    Die Matrix besitzt die Dimension z × z und wird aus einer oberen
+    Hälfte konstruiert, deren Übergangswahrscheinlichkeiten anschließend
+    an der Anti-Diagonalen gespiegelt werden. Dadurch entsteht eine
+    zeilenstochastische Matrix mit Anti-Diagonal-Symmetrie.
+
+    Konstruktion
+    ------------
+    Randzustand (erste Zeile):
+
+    - P(1,1) = (z-1)/z
+    - P(1,2) = 1/z
+
+    Für die Zustände i = 2, ..., z/2 (1-basierte Indizierung):
+
+    - P(i,i-1) = (z-i)/z
+    - P(i,i+1) = i/z
+    - P(i,i) = 0
+
+    Die untere Hälfte der Matrix wird anschließend durch Spiegelung an
+    der Anti-Diagonalen erzeugt:
+
+    .. math::
+
+        P(i,j) = P(z+1-i,\; z+1-j)
+
+    für alle Zustände i > z/2.
+
+    Eigenschaften
+    -------------
+    - Zeilenstochastische Matrix (jede Zeile summiert sich zu 1).
+    - Übergänge sind nur zu benachbarten Zuständen möglich.
+    - Symmetrie bezüglich der Anti-Diagonalen.
+    - Die Übergangswahrscheinlichkeiten ändern sich abhängig von der
+    Position im Zustandsraum.
+
+    Parameters
+    ----------
+    z : int
+        Anzahl der Zustände der Interim-Matrix. Der Wert muss gerade
+        und mindestens 2 sein.
+
+    Returns
+    -------
+    np.ndarray
+        Gewichtete Übergangsmatrix der Dimension z × z.
+
+    Raises
+    ------
+    ValueError
+        Falls z ungerade ist oder kleiner als 2 gewählt wird.
+
+    Notes
+    -----
+    Die Konstruktion erzeugt eine symmetrische Dynamik zwischen linker
+    und rechter Hälfte des Zustandsraums. Während die obere Hälfte
+    explizit definiert wird, entsteht die untere Hälfte vollständig
+    durch Spiegelung an der Anti-Diagonalen.
     """
     # Only works for even z >= 2 to ensure proper structure and avoid issues with the anti-diagonal mirroring
     if z % 2 != 0:
@@ -333,9 +596,46 @@ def build_weighted_interim_matrix(z):
 #Berechnen der Starionären Verteilung
 def stationary_distribution(P: np.ndarray) -> np.ndarray:
     """
-    Rechnet die stationäre Verteilung von der Matrix P.
+    Berechnet die stationäre Verteilung einer diskreten Markov-Kette
+    mit Übergangsmatrix P.
+
+    Die stationäre Verteilung π erfüllt die Gleichung:
+
+        π P = π
+
+    bzw. äquivalent:
+
+        P^T π^T = π^T
+
+    Die Berechnung erfolgt daher über die Eigenzerlegung der transponierten
+    Übergangsmatrix P^T. Der zugehörige Eigenvektor zum Eigenwert 1
+    repräsentiert die stationäre Verteilung.
+
+    Vorgehen
+    --------
+    1. Berechnung aller Eigenwerte und Eigenvektoren von P^T.
+    2. Auswahl des Eigenvektors, dessen Eigenwert am nächsten bei 1 liegt
+    (zur Stabilität gegenüber numerischen Rundungsfehlern).
+    3. Normierung des Eigenvektors, sodass die Einträge zu 1 summieren.
+
+    Parameters
+    ----------
+    P : np.ndarray
+        Zeilenstochastische Übergangsmatrix einer Markov-Kette.
+
+    Returns
+    -------
+    np.ndarray
+        Stationäre Verteilung π als Vektor, normiert auf Summe 1.
+
+    Notes
+    -----
+    - Die Methode setzt voraus, dass die Markov-Kette eine eindeutige
+    stationäre Verteilung besitzt (z. B. bei Irreduzibilität und
+    Aperiodizität).
+    - Numerisch wird der Eigenwert 1 nur näherungsweise getroffen,
+    daher erfolgt die Auswahl über einen Abstandskriterium.
     """
-    
     eigenvalues, eigenvectors = np.linalg.eig(P.T)
     #Berechnet die Eigenwerte und Eigenvektoren von der Matrix P aus einem von Numpy gegebenen Algorythmus
     
@@ -350,6 +650,47 @@ def stationary_distribution(P: np.ndarray) -> np.ndarray:
 
 # Berechnung der vollständigen Treffer-Zeit-Matrix
 def hitting_time_matrix(P: np.ndarray) -> np.ndarray:
+    """
+    Berechnet die Matrix der erwarteten Hitting Times einer Markov-Kette.
+
+    Für eine gegebene Übergangsmatrix P wird für jedes Zustands-Paar
+    (i, j) die erwartete Zeit berechnet, bis Zustand j erstmals ausgehend
+    von Zustand i erreicht wird.
+
+    Definition
+    ----------
+    Die Hitting Time H(i, j) ist definiert als:
+
+        H(i, j) = E[ min{ t ≥ 0 : X_t = j } | X_0 = i ]
+
+    wobei (X_t) die zugrunde liegende Markov-Kette ist.
+
+    Vorgehen
+    --------
+    - Für jedes Startzielpaar (start, target) wird die Funktion
+    `expected_hitting_time(P, start, target)` aufgerufen.
+    - Die Ergebnisse werden in einer n × n Matrix H gespeichert.
+
+    Parameters
+    ----------
+    P : np.ndarray
+        Zeilenstochastische Übergangsmatrix einer Markov-Kette
+        der Dimension n × n.
+
+    Returns
+    -------
+    np.ndarray
+        Matrix H der erwarteten Hitting Times, wobei Eintrag H[i, j]
+        die erwartete Zeit angibt, bis Zustand j erstmals von Zustand i
+        erreicht wird.
+
+    Notes
+    -----
+    - H(i, i) ist typischerweise 0.
+    - Die Berechnung ist rechenintensiv, da für jedes Zustands-Paar
+    ein eigenes lineares Problem bzw. eine Simulation gelöst wird
+    (abhängig von der Implementierung von `expected_hitting_time`).
+    """
     # Anzahl der Zustände in der Markow-Kette
     n = P.shape[0]
     # Initialisierung der Treffer-Zeit-Matrix mit ersteinmal Nullen
@@ -364,6 +705,62 @@ def hitting_time_matrix(P: np.ndarray) -> np.ndarray:
 
 def expected_hitting_time(P, start, target):
     
+    """
+    Berechnet die erwartete Hitting Time zwischen zwei Zuständen einer
+    Markov-Kette.
+
+    Die Hitting Time H(i, j) ist der erwartete Zeitpunkt, zu dem Zustand j
+    erstmals erreicht wird, wenn die Kette in Zustand i startet:
+
+        H(i, j) = E[ min{ t ≥ 0 : X_t = j } | X_0 = i ]
+
+    Mathematische Idee
+    -------------------
+    Für alle Zustände i ≠ target gilt die Rekursion:
+
+        h(i) = 1 + Σ_j P(i, j) h(j)
+
+    mit der Randbedingung:
+
+        h(target) = 0
+
+    Dies führt auf ein lineares Gleichungssystem der Form:
+
+        A h = b
+
+    wobei die Lösung h die erwarteten Treffzeiten zum Zielzustand enthält.
+
+    Vorgehen
+    --------
+    1. Aufbau eines linearen Gleichungssystems der Größe n × n.
+    2. Modifikation der Zielzeile, sodass h(target) = 0 festgesetzt wird.
+    3. Lösung des Systems mittels `np.linalg.solve`.
+    4. Rückgabe des Eintrags h[start].
+
+    Parameters
+    ----------
+    P : np.ndarray
+        Zeilenstochastische Übergangsmatrix einer Markov-Kette.
+
+    start : int
+        Startzustand i.
+
+    target : int
+        Zielzustand j, dessen erste Erreichungszeit berechnet wird.
+
+    Returns
+    -------
+    float
+        Erwartete Anzahl an Schritten, um den Zielzustand vom Startzustand
+        erstmals zu erreichen.
+
+    Notes
+    -----
+    - Falls start == target wird 0 zurückgegeben.
+    - Das Verfahren basiert auf der Lösung eines linearen Gleichungssystems
+    und ist exakt (keine Simulation).
+    - Numerische Stabilität hängt von der Kondition der Matrix A ab.
+    """
     
     n = P.shape[0] 
 
@@ -402,8 +799,6 @@ def expected_hitting_time(P, start, target):
 
 
 if __name__ == "__main__":
-    # Definition der drei Matrixgrößen für die erweiterte Markov-Ketten - n1 für Matrix 1, n2 für Matrix 2, m für die Interim-Matrix
-
     
 
     # Modell 2, Raute entfernen, damit diese benutzt wird und bei dem unteren die Raute setzen.
