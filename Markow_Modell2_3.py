@@ -3,6 +3,11 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+n1 = 4  # A-Matrix-Größe
+n2 = 4  # C-Matrix-Größe
+m = 6   # B-Matrix-Größe
+
+
 np.set_printoptions(precision=2, suppress=True, linewidth=120) 
 #  Anpassbar Nachkommastellen drucken, um Debugging zu ermöglichen.
 #120 Zeichen pro Zeile 
@@ -18,8 +23,6 @@ def build_extended_markov_chain(n1: int, n2: int, m: int) -> np.ndarray:
     #assert m >= 4, "Interim matrix size m must be at least 4"
     M1 = create_markov_matrix(n1)   # Form (n1+1, n1+1)
     M2 = create_markov_matrix(n2)   # Form (n2+1, n2+1)
-    print(M2)
-    exit()
     Interim = np.full((m, m), 1.0 / m)   # Gleichverteilung der innerne Matrix
 
     
@@ -326,28 +329,8 @@ def build_weighted_interim_matrix(z):
 
     return P
 
-def step_counter_stationary_distribution(P: np.ndarray, change_value: float = 1e-7) -> np.ndarray:
-    """
-    Berechnet die Anzahl der Schritte, die benötigt werden, um von jeder Zeile der Übergangsmatrix P zur stationären Verteilung zu konvergieren.
 
-
-    """
-    # Anzahl der Zustände in der Markov-Kette
-    n = P.shape[0]
-    stat_dist_iter = np.zeros(n)
-    for i in range(n):
-        pi = P[i, :].copy()
-        counter = 0
-        for _ in range(1000000):
-            counter += 1 # Schrittzähler erhöhen
-            pi_next = pi @ P # Berechnung der nächsten Verteilung durch Multiplikation mit der Übergangsmatrix
-            # Überprüfen, ob die Änderung der Verteilung kleiner als der Schwellenwert ist (Konvergenz zur stationären Verteilung)
-            if np.linalg.norm(pi_next - pi, ord=1) < change_value: 
-                break
-            pi = pi_next # Aktualisierung der aktuellen Verteilung für den nächsten Schritt
-        stat_dist_iter[i] = counter # Anzahl der Schritte bis zur Konvergenz für die i-te Zeile speichern
-    return stat_dist_iter
-
+#Berechnen der Starionären Verteilung
 def stationary_distribution(P: np.ndarray) -> np.ndarray:
     """
     Rechnet die stationäre Verteilung von der Matrix P.
@@ -420,12 +403,10 @@ def expected_hitting_time(P, start, target):
 
 if __name__ == "__main__":
     # Definition der drei Matrixgrößen für die erweiterte Markov-Ketten - n1 für Matrix 1, n2 für Matrix 2, m für die Interim-Matrix
-    n1 = 4   
-    n2 = 4
-    m = 6 
+
     
 
-    # Modell 2 
+    # Modell 2, Raute entfernen, damit diese benutzt wird und bei dem unteren die Raute setzen.
     #P = build_extended_markov_chain(n1, n2, m) 
     
     # Modell 3
@@ -460,21 +441,17 @@ if __name__ == "__main__":
     print(cover_time_vector)
     print("--------------------------------")
     #Schrittweise Berechnung der stationären Verteilung durch Iteration und Abbruchbedingung, wenn die Änderung kleiner als change_value ist. Vergleich mit der stationären Verteilung aus der Eigenvektormethode.
-    stat_dist_iter = step_counter_stationary_distribution(P, change_value=0.000000000000001)
-    print("Schrittzahl der stationären Verteilung durch Iteration und Vergleich mit der stationären Verteilung aus der Eigenvektormethode (mit 2 Dezimalstellen):")
-    print (stat_dist_iter)
     print("--------------------------------")
     #stationäre Verteilung mittels Eigenvektormethode
     stationary_dist = stationary_distribution(P)
     print("Stationäre Verteilung:" + f" {stationary_dist}")
-
 
     P_size = [] #Visualisierung der Mischzeiten Modell 2
     mixing_times = []
     for i in range(2,1000000,2): 
         #Visualisierung der Vergrößerung der Mischzeit durch Vergrößerung der Gesamtmatrix
         P = build_extended_markov_chain(i,i+2,i)
-        if P.shape[0] > 100:
+        if P.shape[0] > 1000:
             print(P.shape[0])
             break
         eigenwerte = np.linalg.eigvals(P)

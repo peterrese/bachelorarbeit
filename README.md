@@ -29,3 +29,6 @@ python .\Markow_Modell2_3.py
 ``` 
 
 ## Tuning der Ausführung
+Um die Größe der erstellten Markov-Ketten Blasen anzupassen, gibt es drei Variablen, die angepasst werden müssen n1 (A), n2 (B), und m (C).  
+Diese können im Code in Zeile 6, 7, und 8 angepasst werden.
+
